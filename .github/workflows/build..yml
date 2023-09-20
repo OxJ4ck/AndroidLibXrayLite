@@ -1,47 +1,49 @@
-name: Release Build
+name: Build libv2ray.aar
+
 on:
+  push:
   workflow_dispatch:
+    inputs:
+      XRAY_CORE_VERSION:
+        description: 'Xray core version or commit hash'
+        required: true
+
 jobs:
   build:
-      name: Build
-      runs-on: ubuntu-latest
-      steps:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Checkout
-        uses: actions/checkout@v3
+    - name: Setup Golang
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21.1'
 
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21.1'
+    - name: Install gomobile
+      run: |
+        go install golang.org/x/mobile/cmd/gomobile@latest
+        echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
-      - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1.2.0
-        id: setup-ndk
-        with:
-          ndk-version: r25c
-          add-to-path: false
+    - name: Setup Android environment
+      uses: android-actions/setup-android@v2
 
-      - name: Setup Gomobile
-        run: |
-          go install golang.org/x/mobile/cmd/gomobile@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+    - name: Build dependencies
+      run: |
+        go get github.com/xtls/xray-core@${{ github.event.inputs.XRAY_CORE_VERSION }} || true
+        gomobile init
+        go mod tidy -v
+        gomobile bind -v -androidapi 19 -ldflags='-s -w' ./
 
-      - name: Build Lib
-        run: |
-          export ANDROID_NDK_HOME="${ANDROID_NDK_HOME}"
-          gomobile init
-          go mod tidy -v
-          gomobile bind -v -androidapi 19 -ldflags='-s -w' ./
+    - uses: actions/upload-artifact@v3.1.1
+      with:
+        name: libv2ray
+        path: libv2ray.aar
 
-      - uses: actions/upload-artifact@v3.1.1
-        with:
-          name: libv2ray
-          path: libv2ray.aar
-
-      - name: Upload apk to release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag: ${{ github.ref_name }}
-          tag_name: release
-          files: libv2ray.aar
+    - name: Upload apk to release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag: ${{ github.ref_name }}
+        tag_name: release
+        files: libv2ray.aar
