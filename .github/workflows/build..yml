@@ -1,7 +1,6 @@
 name: Build libv2ray.aar
 
 on:
-  push:
   workflow_dispatch:
     inputs:
       XRAY_CORE_VERSION:
